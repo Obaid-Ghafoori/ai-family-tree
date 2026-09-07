@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "AncestorAI",
+    "slug": "ancestor-ai",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "ancestorai",
+    "ios": { "supportsTablet": true },
+    "android": {}
+  }
+}
