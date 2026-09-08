@@ -1,193 +1,169 @@
 import React, { useMemo, useState } from "react";
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import type { FamilyGraph, Person, ResearchFinding } from "./src/types";
 
-type Person = {
-  id: string;
-  name: string;
-  birthYear?: number;
-  deathYear?: number;
-  place?: string;
+const me: Person = { id:"me", givenName:"You", birthDate:"1990", birthPlace:"Your hometown" };
+const father: Person = { id:"father", givenName:"Your Father", birthDate:"1960" };
+const mother: Person = { id:"mother", givenName:"Your Mother", birthDate:"1963" };
+
+const initialGraph: FamilyGraph = {
+  people:[me,father,mother],
+  relationships:[
+    { id:"r1", fromPersonId:"father", toPersonId:"me", type:"parent", confirmed:true, sourceIds:[] },
+    { id:"r2", fromPersonId:"mother", toPersonId:"me", type:"parent", confirmed:true, sourceIds:[] }
+  ],
+  evidence:[]
 };
 
-const seedPeople: Person[] = [
-  { id: "me", name: "You", birthYear: 1990, place: "Your hometown" },
-  { id: "father", name: "Your Father", birthYear: 1960, place: "Unknown" },
-  { id: "mother", name: "Your Mother", birthYear: 1963, place: "Unknown" }
-];
-
-const mockFindings = [
-  {
-    id: "finding-1",
-    name: "Possible grandfather",
-    birthYear: 1932,
-    confidence: 91,
-    explanation:
-      "This is a demonstration finding. In production, the app will only score a candidate using connected historical sources and user-provided evidence.",
-    evidence: ["User-provided family information", "Demo census record"]
-  }
-];
+const demoFinding: ResearchFinding = {
+  id:"demo-1",
+  person:{ id:"candidate-grandfather", givenName:"Possible Grandfather", birthDate:"1932" },
+  relationship:"parent",
+  confidence:91,
+  reasoning:"Demo candidate based on the known parent relationship. Production research must compare historical records and show sources.",
+  evidence:[{id:"e1",title:"User-provided family information",source:"Family tree"}],
+  status:"pending"
+};
 
 export default function App() {
-  const [people, setPeople] = useState(seedPeople);
-  const [selected, setSelected] = useState<Person | null>(null);
-  const [discovering, setDiscovering] = useState(false);
-  const [findings, setFindings] = useState<typeof mockFindings>([]);
+  const [graph,setGraph]=useState<FamilyGraph>(initialGraph);
+  const [screen,setScreen]=useState<"tree"|"discover"|"person">("tree");
+  const [selectedId,setSelectedId]=useState("me");
+  const [finding,setFinding]=useState<ResearchFinding|null>(null);
+  const [loading,setLoading]=useState(false);
+  const [adding,setAdding]=useState(false);
+  const [name,setName]=useState("");
+  const [birth,setBirth]=useState("");
 
-  const parents = useMemo(() => people.filter(p => p.id !== "me"), [people]);
+  const selected=graph.people.find(p=>p.id===selectedId) ?? me;
+  const parents=useMemo(
+    ()=>graph.relationships
+      .filter(r=>r.toPersonId==="me"&&r.type==="parent")
+      .map(r=>graph.people.find(p=>p.id===r.fromPersonId))
+      .filter(Boolean) as Person[],
+    [graph]
+  );
+  const candidate=graph.people.find(p=>p.id==="candidate-grandfather");
 
-  const discover = () => {
-    setDiscovering(true);
-    setTimeout(() => {
-      setFindings(mockFindings);
-      setDiscovering(false);
-    }, 700);
-  };
-
-  const acceptFinding = () => {
-    const f = findings[0];
-    if (!f) return;
-    setPeople(current => [
-      ...current,
-      { id: "grandfather-demo", name: f.name, birthYear: f.birthYear }
-    ]);
-    setFindings([]);
-  };
-
-  if (selected) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <StatusBar style="auto" />
-        <ScrollView contentContainerStyle={styles.container}>
-          <TouchableOpacity onPress={() => setSelected(null)}>
-            <Text style={styles.back}>‹ Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>{selected.name}</Text>
-          <Text style={styles.subtitle}>
-            {selected.birthYear ? `Born ${selected.birthYear}` : "Birth year unknown"}
-          </Text>
-
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Family</Text>
-            <Text style={styles.body}>Parents and relationships will appear here.</Text>
-          </View>
-
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>AI research</Text>
-            <Text style={styles.body}>
-              Ask the research engine to look for possible parents. Every result will require review.
-            </Text>
-            <TouchableOpacity style={styles.primary} onPress={discover}>
-              <Text style={styles.primaryText}>{discovering ? "Researching…" : "Find possible ancestors"}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {findings.map(f => (
-            <View key={f.id} style={styles.finding}>
-              <Text style={styles.badge}>DEMO FINDING</Text>
-              <Text style={styles.cardTitle}>{f.name}</Text>
-              <Text style={styles.confidence}>{f.confidence}% confidence</Text>
-              <Text style={styles.body}>{f.explanation}</Text>
-              <Text style={styles.cardTitle}>Evidence</Text>
-              {f.evidence.map(e => <Text key={e} style={styles.body}>• {e}</Text>)}
-              <View style={styles.row}>
-                <TouchableOpacity style={styles.secondary} onPress={() => setFindings([])}>
-                  <Text>Reject</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.primarySmall} onPress={acceptFinding}>
-                  <Text style={styles.primaryText}>Accept</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))}
-        </ScrollView>
-      </SafeAreaView>
-    );
+  function discover() {
+    setScreen("discover"); setLoading(true); setFinding(null);
+    setTimeout(()=>{setFinding({...demoFinding,status:"pending"});setLoading(false)},600);
   }
 
-  return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar style="auto" />
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.eyebrow}>ANCESTORAI</Text>
-        <Text style={styles.title}>Discover your family story</Text>
-        <Text style={styles.subtitle}>Start with what you know. AI helps you investigate what came before.</Text>
+  function accept() {
+    if(!finding || graph.people.some(p=>p.id===finding.person.id)) return;
+    setGraph(g=>({
+      ...g,
+      people:[...g.people,finding.person],
+      relationships:[
+        ...g.relationships,
+        {id:"r-candidate",fromPersonId:finding.person.id,toPersonId:"father",type:"parent",confirmed:true,sourceIds:finding.evidence.map(e=>e.id)}
+      ]
+    }));
+    setFinding(null);
+    Alert.alert("Added to tree","The candidate is now confirmed in this demo tree.");
+  }
 
-        <View style={styles.tree}>
-          <Text style={styles.generation}>PARENTS</Text>
-          <View style={styles.row}>
-            {parents.map(p => (
-              <TouchableOpacity key={p.id} style={styles.person} onPress={() => setSelected(p)}>
-                <Text style={styles.personName}>{p.name}</Text>
-                <Text style={styles.personYear}>{p.birthYear}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+  function addPerson() {
+    if(!name.trim()) return Alert.alert("Name required","Enter a name.");
+    const id=`p-${Date.now()}`;
+    setGraph(g=>({...g,people:[...g.people,{id,givenName:name.trim(),birthDate:birth||undefined}]}));
+    setName(""); setBirth(""); setAdding(false);
+  }
 
-          <Text style={styles.connector}>│</Text>
-          <Text style={styles.connector}>▼</Text>
+  return <SafeAreaView style={s.safe}>
+    <StatusBar style="dark"/>
+    <ScrollView contentContainerStyle={s.container}>
+      <View style={s.header}>
+        <View><Text style={s.eyebrow}>ANCESTORAI</Text><Text style={s.title}>{screen==="person"?selected.givenName:"Your family story"}</Text></View>
+        <TouchableOpacity style={s.plus} onPress={()=>setAdding(true)}><Text style={s.plusText}>+</Text></TouchableOpacity>
+      </View>
 
-          <TouchableOpacity style={styles.you} onPress={() => setSelected(people[0])}>
-            <Text style={styles.youName}>You</Text>
-            <Text>1990</Text>
-          </TouchableOpacity>
+      {screen==="tree" && <>
+        <Text style={s.subtitle}>Build what you know first. AI can then help investigate earlier generations.</Text>
+        <View style={s.card}>
+          <Text style={s.label}>FAMILY TREE</Text>
+          <View style={s.row}>{parents.map(p=><TouchableOpacity key={p.id} style={s.person} onPress={()=>{setSelectedId(p.id);setScreen("person")}}>
+            <View style={s.avatar}><Text>{p.givenName[0]}</Text></View><Text style={s.personName}>{p.givenName}</Text><Text style={s.meta}>{p.birthDate||"Year unknown"}</Text>
+          </TouchableOpacity>)}</View>
+          <Text style={s.arrow}>↓</Text>
+          <TouchableOpacity style={s.you} onPress={()=>setScreen("person")}><Text style={s.kicker}>YOU</Text><Text style={s.youName}>You</Text><Text style={s.meta}>1990</Text></TouchableOpacity>
+          {candidate && <><Text style={s.arrow}>↑</Text><TouchableOpacity style={s.ancestor} onPress={()=>{setSelectedId(candidate.id);setScreen("person")}}><Text style={s.kicker}>ANCESTOR</Text><Text style={s.personName}>{candidate.givenName}</Text><Text style={s.meta}>1932 · verified</Text></TouchableOpacity></>}
         </View>
+        <TouchableOpacity style={s.ai} onPress={discover}><Text style={s.aiIcon}>✦</Text><View style={{flex:1}}><Text style={s.aiTitle}>Discover ancestors</Text><Text style={s.aiBody}>Research possible parents and review evidence before adding them.</Text></View><Text style={s.chevron}>›</Text></TouchableOpacity>
+      </>}
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>AI Discover</Text>
-          <Text style={styles.body}>
-            Research missing generations, compare possible matches, and review evidence before adding anyone.
-          </Text>
-          <TouchableOpacity style={styles.primary} onPress={discover}>
-            <Text style={styles.primaryText}>{discovering ? "Researching…" : "Find ancestors"}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {findings.map(f => (
-          <View key={f.id} style={styles.finding}>
-            <Text style={styles.badge}>DEMO FINDING</Text>
-            <Text style={styles.cardTitle}>{f.name}</Text>
-            <Text style={styles.confidence}>{f.confidence}% confidence</Text>
-            <Text style={styles.body}>{f.explanation}</Text>
-            <View style={styles.row}>
-              <TouchableOpacity style={styles.secondary} onPress={() => setFindings([])}>
-                <Text>Reject</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.primarySmall} onPress={acceptFinding}>
-                <Text style={styles.primaryText}>Accept</Text>
-              </TouchableOpacity>
-            </View>
+      {screen==="discover" && <>
+        <Text style={s.subtitle}>Findings are suggestions until you review and accept them.</Text>
+        <TouchableOpacity style={s.primary} onPress={discover} disabled={loading}><Text style={s.primaryText}>{loading?"Researching…":"Research again"}</Text></TouchableOpacity>
+        {loading && <View style={s.card}><Text style={s.body}>Comparing known family information…</Text><Text style={s.body}>Preparing evidence…</Text></View>}
+        {finding && <View style={s.card}>
+          <Text style={s.badge}>DEMO / VERIFY SOURCES</Text>
+          <Text style={s.finding}>{finding.person.givenName}</Text>
+          <Text style={s.body}>Possible parent of Your Father</Text>
+          <View style={s.confRow}><Text>Confidence</Text><Text style={{fontWeight:"800"}}>{finding.confidence}%</Text></View>
+          <View style={s.track}><View style={[s.fill,{width:`${finding.confidence}%`}]}/></View>
+          <Text style={s.section}>Reasoning</Text><Text style={s.body}>{finding.reasoning}</Text>
+          <Text style={s.section}>Evidence</Text>
+          {finding.evidence.map(e=><Text key={e.id} style={s.evidence}>✓ {e.title} — {e.source}</Text>)}
+          <View style={s.actions}>
+            <TouchableOpacity style={s.secondary} onPress={()=>setFinding(null)}><Text>Reject</Text></TouchableOpacity>
+            <TouchableOpacity style={s.primarySmall} onPress={accept}><Text style={s.primaryText}>Accept</Text></TouchableOpacity>
           </View>
-        ))}
-      </ScrollView>
-    </SafeAreaView>
-  );
+        </View>}
+        {!finding&&!loading&&<View style={s.card}><Text style={s.finding}>No pending findings</Text><Text style={s.body}>Start research to generate a candidate.</Text></View>}
+      </>}
+
+      {screen==="person" && <>
+        <TouchableOpacity onPress={()=>setScreen("tree")}><Text style={s.back}>‹ Back to tree</Text></TouchableOpacity>
+        <View style={s.profile}>
+          <View style={s.largeAvatar}><Text style={{fontSize:28}}>{selected.givenName[0]}</Text></View>
+          <Text style={s.profileName}>{selected.givenName} {selected.familyName||""}</Text>
+          <Text style={s.subtitle}>{selected.birthDate?`Born ${selected.birthDate}`:"Birth year unknown"}</Text>
+        </View>
+        <TouchableOpacity style={s.primary} onPress={discover}><Text style={s.primaryText}>Find possible ancestors</Text></TouchableOpacity>
+      </>}
+
+      <View style={s.nav}>
+        {(["tree","discover","person"] as const).map(k=>
+          <TouchableOpacity key={k} style={s.navItem} onPress={()=>setScreen(k)}>
+            <Text style={screen===k?s.active:s.navText}>{k[0].toUpperCase()+k.slice(1)}</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </ScrollView>
+
+    {adding&&<View style={s.overlay}>
+      <View style={s.modal}>
+        <Text style={s.modalTitle}>Add family member</Text>
+        <TextInput style={s.input} placeholder="Full name" value={name} onChangeText={setName}/>
+        <TextInput style={s.input} placeholder="Birth year (optional)" value={birth} onChangeText={setBirth} keyboardType="number-pad"/>
+        <TouchableOpacity style={s.primary} onPress={addPerson}><Text style={s.primaryText}>Add person</Text></TouchableOpacity>
+        <TouchableOpacity style={s.cancel} onPress={()=>setAdding(false)}><Text>Cancel</Text></TouchableOpacity>
+      </View>
+    </View>}
+  </SafeAreaView>
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F7F8FA" },
-  container: { padding: 20, paddingBottom: 48 },
-  eyebrow: { fontSize: 12, fontWeight: "700", letterSpacing: 2, marginBottom: 8 },
-  title: { fontSize: 32, fontWeight: "800", lineHeight: 38, marginBottom: 8 },
-  subtitle: { fontSize: 16, lineHeight: 24, color: "#5E6470", marginBottom: 20 },
-  back: { fontSize: 18, marginBottom: 18 },
-  tree: { backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, marginBottom: 16, alignItems: "center" },
-  generation: { fontSize: 11, fontWeight: "700", letterSpacing: 1.5, marginBottom: 12 },
-  row: { flexDirection: "row", gap: 10, alignItems: "center" },
-  person: { backgroundColor: "#EEF1F5", borderRadius: 16, padding: 14, minWidth: 125 },
-  personName: { fontWeight: "700", marginBottom: 4 },
-  personYear: { color: "#6B7280" },
-  connector: { fontSize: 18, color: "#737985", lineHeight: 20 },
-  you: { backgroundColor: "#E8EEF9", borderRadius: 18, padding: 18, minWidth: 140, alignItems: "center" },
-  youName: { fontWeight: "800", fontSize: 18 },
-  card: { backgroundColor: "#FFFFFF", borderRadius: 20, padding: 18, marginBottom: 14 },
-  finding: { backgroundColor: "#FFFDF7", borderRadius: 20, padding: 18, marginBottom: 14, borderWidth: 1, borderColor: "#E7E0C8" },
-  cardTitle: { fontSize: 18, fontWeight: "800", marginBottom: 8 },
-  body: { color: "#5E6470", lineHeight: 22, marginBottom: 10 },
-  primary: { backgroundColor: "#111827", borderRadius: 14, padding: 15, alignItems: "center", marginTop: 8 },
-  primarySmall: { backgroundColor: "#111827", borderRadius: 12, paddingVertical: 12, paddingHorizontal: 20 },
-  primaryText: { color: "#FFFFFF", fontWeight: "700" },
-  secondary: { backgroundColor: "#EEF1F5", borderRadius: 12, paddingVertical: 12, paddingHorizontal: 20 },
-  badge: { fontSize: 10, fontWeight: "800", letterSpacing: 1, marginBottom: 8 },
-  confidence: { fontWeight: "800", marginBottom: 8 }
+const s=StyleSheet.create({
+  safe:{flex:1,backgroundColor:"#F6F4EF"},container:{padding:20,paddingBottom:40},
+  header:{flexDirection:"row",justifyContent:"space-between",alignItems:"center",marginBottom:12},
+  eyebrow:{fontSize:11,fontWeight:"800",letterSpacing:2.4,color:"#6B665D"},title:{fontSize:30,fontWeight:"800",color:"#191814",marginTop:4},
+  subtitle:{fontSize:15,lineHeight:23,color:"#69655D",marginBottom:18},plus:{width:44,height:44,borderRadius:22,backgroundColor:"#191814",alignItems:"center",justifyContent:"center"},plusText:{color:"#FFF",fontSize:25},
+  card:{backgroundColor:"#FFF",borderRadius:22,padding:18,marginBottom:14,borderWidth:1,borderColor:"#E5E0D7"},label:{fontSize:10,fontWeight:"800",letterSpacing:1.5,color:"#8A847A",marginBottom:14},
+  row:{flexDirection:"row",gap:10},person:{flex:1,backgroundColor:"#F1EEE7",borderRadius:17,padding:13},avatar:{width:34,height:34,borderRadius:17,backgroundColor:"#DDD7CA",alignItems:"center",justifyContent:"center",marginBottom:8},
+  personName:{fontWeight:"800",fontSize:15,color:"#24211C"},meta:{fontSize:12,color:"#777168",marginTop:3},arrow:{textAlign:"center",fontSize:20,color:"#9A948A",marginVertical:5},
+  you:{alignItems:"center",backgroundColor:"#E7EEE8",borderRadius:18,padding:15,width:"70%",alignSelf:"center"},kicker:{fontSize:9,fontWeight:"800",letterSpacing:1.4,color:"#607363"},youName:{fontSize:18,fontWeight:"800",color:"#243328",marginTop:3},
+  ancestor:{width:"82%",alignSelf:"center",backgroundColor:"#F8F3E4",borderRadius:16,padding:14},ai:{flexDirection:"row",alignItems:"center",backgroundColor:"#191814",borderRadius:20,padding:16},
+  aiIcon:{color:"#FFF",fontSize:22,marginRight:12},aiTitle:{color:"#FFF",fontWeight:"800",fontSize:16},aiBody:{color:"#C9C6BD",fontSize:12,lineHeight:18,marginTop:3},chevron:{color:"#FFF",fontSize:28},
+  primary:{backgroundColor:"#191814",borderRadius:14,padding:16,alignItems:"center",marginBottom:14},primarySmall:{backgroundColor:"#191814",borderRadius:13,paddingVertical:12,paddingHorizontal:18},primaryText:{color:"#FFF",fontWeight:"800"},
+  secondary:{backgroundColor:"#ECE9E2",borderRadius:13,paddingVertical:12,paddingHorizontal:18},actions:{flexDirection:"row",justifyContent:"flex-end",gap:10,marginTop:16},
+  badge:{alignSelf:"flex-start",backgroundColor:"#F8F3E4",color:"#8C7850",padding:7,borderRadius:7,fontSize:9,fontWeight:"900",marginBottom:10},finding:{fontSize:21,fontWeight:"800",color:"#191814",marginBottom:4},
+  body:{color:"#6A655D",lineHeight:21},confRow:{flexDirection:"row",justifyContent:"space-between",marginTop:15},track:{height:8,backgroundColor:"#ECE9E2",borderRadius:4,overflow:"hidden",marginTop:8,marginBottom:12},fill:{height:8,backgroundColor:"#6E7D6D"},
+  section:{fontSize:12,fontWeight:"800",marginTop:8,marginBottom:5},evidence:{color:"#4D5D4E",lineHeight:22},back:{marginBottom:14},profile:{backgroundColor:"#FFF",borderRadius:22,padding:22,alignItems:"center",marginBottom:14},
+  largeAvatar:{width:72,height:72,borderRadius:36,backgroundColor:"#E7EEE8",alignItems:"center",justifyContent:"center",marginBottom:12},profileName:{fontSize:25,fontWeight:"800",marginBottom:5},
+  nav:{flexDirection:"row",backgroundColor:"#FFF",borderRadius:18,padding:6,marginTop:18,borderWidth:1,borderColor:"#E5E0D7"},navItem:{flex:1,alignItems:"center",paddingVertical:11},navText:{fontSize:13,fontWeight:"700",color:"#999289"},active:{fontSize:13,fontWeight:"800",color:"#191814"},
+  overlay:{position:"absolute",left:0,right:0,top:0,bottom:0,backgroundColor:"rgba(20,19,16,.42)",justifyContent:"flex-end"},modal:{backgroundColor:"#FFF",borderTopLeftRadius:26,borderTopRightRadius:26,padding:22,paddingBottom:34},
+  modalTitle:{fontSize:22,fontWeight:"800",marginBottom:16},input:{backgroundColor:"#F3F1EC",borderRadius:13,padding:14,marginBottom:10,fontSize:15},cancel:{alignItems:"center",padding:13}
 });

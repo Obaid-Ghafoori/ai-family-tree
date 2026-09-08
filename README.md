@@ -1,37 +1,31 @@
-# AI Family Tree
+# AI Family Tree MVP
 
-Mobile-first genealogy app starter.
+Mobile-first genealogy app built with Expo + React Native + TypeScript.
 
-## Stack
-- Mobile: Expo + React Native + TypeScript
-- Backend: Node.js + Express + TypeScript
-- AI: provider interface with a safe mock researcher for the MVP
-- Data model: family graph concepts designed for PostgreSQL later
+## Included
+- Data-driven family graph
+- Add people
+- Person profiles
+- Ancestor discovery review flow
+- Confidence and evidence model
+- API placeholder for future research providers
 
-## Project structure
+## Run the mobile app
 
-- `apps/mobile` — iOS/Android Expo app
-- `apps/api` — Node/Express API
-- `packages/shared` — shared TypeScript types
-
-## Run
-
-### Mobile
-```bash
 cd apps/mobile
 npm install
 npx expo start
-```
 
-### API
-```bash
+Then scan the QR code with Expo Go or run on an emulator.
+
+## Run the API
+
 cd apps/api
 npm install
 npm run dev
-```
 
-The first vertical slice is:
-Create/seed a family tree → view people → open a person → request AI ancestor suggestions → review evidence/confidence.
+The API listens on port 4000 by default.
 
-## Important
-The research endpoint currently returns clearly-labelled mock findings. Do not treat mock findings as real genealogy evidence. Connect verified genealogy sources before enabling real-world ancestor discovery.
+## Product rule
+
+AI findings are candidates until a person explicitly reviews and accepts them. The app must never silently convert an AI guess into a confirmed family relationship.
